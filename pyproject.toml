@@ -1,0 +1,32 @@
+[project]
+name = "ftrag-against-the-machine"
+version = "0.1.0"
+description = "Add your description here"
+requires-python = ">=3.14"
+dependencies = [
+    "accelerate>=1.14.0",
+    "fire>=0.7.1",
+    "langchain-text-splitters>=1.1.2",
+    "pydantic>=2.13.4",
+    "torch>=2.13.0",
+    "tqdm>=4.70.0",
+    "transformers>=5.16.1",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.mypy]
+exclude = [
+    'data/',
+    '\.venv/',
+    'build/',
+    'dist/',
+    'tests/'
+]
