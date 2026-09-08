@@ -3,6 +3,17 @@ from src.utils.exits import error_exit
 
 
 def log_location() -> str | None:
+    """
+    Determines the class and function name of the caller.
+
+    Uses the inspect module to step back one frame in the call stack
+    and extract the execution context. If called inside a class method,
+    it identifies the class name via the 'self' reference.
+
+    Returns:
+        str: A formatted string indicating the caller's location
+             (e.g., '>>> Location: MyClass.my_method').
+    """
     frame = inspect.currentframe()
     try:
         if frame and frame.f_back:

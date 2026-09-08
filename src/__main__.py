@@ -6,7 +6,7 @@ from src.entities.chunker import Chunker
 from src.entities.config import DefaultConfig as Def_Con
 from src.entities.file_io import FileIO as F_io
 from src.entities.llm_engine import LLMEngine
-from src.entities.models import BM25Stat, IndexFile, StudentSearchResults, StudentSearchResultsAndAnswer, MinimalAnswer
+from src.entities.models import BM25Stat, IndexFile, StudentSearchResultsAndAnswer, MinimalAnswer
 from src.entities.path_finder import PathFinder
 from src.entities.models import RagDataset as RagData
 from src.entities.models import MinimalSource as MinSou
@@ -17,7 +17,14 @@ from src.entities.models import StudentSearchResults as StSeRe
 class RAGPipeline:
     def index(self, max_chunk_size: int = 2000) -> None:
         """
-        Ingest data/raw/ and build the index under data/processed/.
+        Parses raw data and builds the BM25 index.
+
+        Scans the raw directory for valid files, splits them into chunks
+        based on max_chunk_size, calculates BM25 statistics, and saves
+        the processed index to the disk.
+
+        Args:
+            max_chunk_size (int): Maximum character length for a single chunk.
         """
         print(f"-> 'Index' command called.\n"
               f"-> max_chunk_size = {max_chunk_size}")
@@ -43,12 +50,12 @@ class RAGPipeline:
 
         index_wrapper = IndexFile(chunks=minimal_source_to_save)
 
-        F_io.file_write(
+        F_io.file_write_json(
             dir_path=Def_Con.processed_files_dir,
             file_name=Def_Con.index_file_name,
             data=index_wrapper
         )
-        F_io.file_write(
+        F_io.file_write_json(
             dir_path=Def_Con.processed_files_dir,
             file_name=Def_Con.bm25s_file_name,
             data=bm25s
@@ -56,7 +63,11 @@ class RAGPipeline:
 
     def search(self, query: str, k: int = 5) -> None:
         """
-        Return the top-k sources for a single query.
+        Retrieves and prints the top-k document chunks for a single search query.
+
+        Args:
+            query (str): The search prompt.
+            k (int): The number of top results to return.
         """
         print(f"-> 'Search' command called.\n"
               f"-> Query = '{query}',\n"
@@ -77,7 +88,15 @@ class RAGPipeline:
 
     def search_dataset(self, dataset_path: str, save_directory: str, k: int = 5) -> None:
         """
-        Run search over a whole dataset and write a StudentSearchResults JSON file.
+        Executes a batch search over an entire dataset of questions.
+
+        Evaluates each question in the dataset using the BM25 index and
+        saves the aggregated results to a JSON file.
+
+        Args:
+            dataset_path (str): Path to the input dataset JSON.
+            save_directory (str): Directory where the search results will be saved.
+            k (int): The number of chunks to retrieve per question.
         """
         print(f"-> 'Search_dataset' command called.\n"
               f"-> Dataset path = {dataset_path}\n"
@@ -120,7 +139,7 @@ class RAGPipeline:
             search_results=all_results,
             k=k
         )
-        F_io.file_write(
+        F_io.file_write_json(
             dir_path=Path(save_directory),
             file_name=Path(dataset_path).name,
             data=final_output
@@ -128,7 +147,11 @@ class RAGPipeline:
 
     def answer(self, query: str, k: int = 5) -> None:
         """
-        Answer a single query using the retrieved context.
+        Generates an LLM answer for a single query using retrieved context.
+
+        Args:
+            query (str): The user's question.
+            k (int): The number of chunks to retrieve and use as context.
         """
         print(f"-> 'Answer' command called.\n"
               f"-> query = '{query}'\n"
@@ -157,7 +180,14 @@ class RAGPipeline:
 
     def answer_dataset(self, student_search_results_path: str, save_directory: str) -> None:
         """
-        Generate answers for a dataset, producing a StudentSearchResultsAndAnswer JSON file.
+        Generates answers for a batch of previously retrieved search results.
+
+        Reads the chunks coordinates, loads their text content to form a context window,
+        and prompts the LLM to answer each question. Saves the final dataset to disk.
+
+        Args:
+            student_search_results_path (str): Path to the JSON containing search results.
+            save_directory (str): Directory to save the final answers JSON.
         """
         print(f"-> 'Answer_dataset' command called.\n"
               f"-> results_path = {student_search_results_path}\n"
@@ -166,7 +196,7 @@ class RAGPipeline:
         llm_engine = LLMEngine()
         llm_engine.load_model()
 
-        query_list_obj = F_io.file_read_json(path=Path(student_search_results_path), obj=StudentSearchResults)
+        query_list_obj = F_io.file_read_json(path=Path(student_search_results_path), obj=StSeRe)
 
         all_answers = []
         for obj in tqdm(query_list_obj.search_results, desc="Answering dataset", unit="query"):
@@ -190,7 +220,7 @@ class RAGPipeline:
             k=query_list_obj.k
         )
 
-        F_io.file_write(
+        F_io.file_write_json(
             dir_path=Path(save_directory),
             file_name=Path(student_search_results_path).name,
             data=final_output
@@ -198,14 +228,21 @@ class RAGPipeline:
 
     def evaluate(self, student_search_results_path: str, dataset_path: str) -> None:
         """
-        Report your own recall@k against a ground-truth dataset, for your own testing.
+        Locally evaluates search accuracy (Recall@k) against a ground-truth dataset.
+
+        Uses Intersection over Union (IoU >= 0.05) on character indices to determine
+        if a retrieved chunk successfully matches the expected source document.
+
+        Args:
+            student_search_results_path (str): Path to the generated search results.
+            dataset_path (str): Path to the ground-truth dataset containing correct sources.
         """
         print(f"-> 'Evaluate' command called.\n"
               f"-> results_path = {student_search_results_path}\n"
               f"-> dataset_path = {dataset_path}")
 
         # Читаем результаты поиска и эталонный датасет
-        student_results = F_io.file_read_json(path=Path(student_search_results_path), obj=StudentSearchResults)
+        student_results = F_io.file_read_json(path=Path(student_search_results_path), obj=StSeRe)
         ground_truth = F_io.file_read_json(path=Path(dataset_path), obj=RagData)
 
         # Собираем словарь правильных ответов для быстрого поиска по question_id

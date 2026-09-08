@@ -2,14 +2,24 @@ import math
 import string
 from collections import Counter
 from src.entities.models import BM25Stat as BM25s
-from src.utils import log_location
+from src.utils.log_location import log_location
 from src.utils.exits import error_exit
 from collections import defaultdict
 
 
 class BM25Methods:
+    """
+    Provides static methods to build and query a BM25 sparse retrieval index.
+    """
     @staticmethod
     def despatch_bm25_stat(text: str, bm25s: BM25s) -> None:
+        """
+        Processes a raw text chunk and updates the global BM25 statistics.
+
+        Args:
+            text (str): The raw text content of the chunk.
+            bm25s (BM25s): The BM25 statistics dataclass to update.
+        """
         tokens = BM25Methods.tokenize(text)
         tokens_freq = BM25Methods._count_frequencies(tokens)
         word_quan = len(tokens)
@@ -23,6 +33,16 @@ class BM25Methods:
 
     @staticmethod
     def tokenize(text: str) -> list[str]:
+        """
+        Cleans and tokenizes text by removing punctuation (except underscores),
+        converting to lowercase, and splitting by whitespace.
+
+        Args:
+            text (str): The raw text to tokenize.
+
+        Returns:
+            list[str]: A list of cleaned, lowercase tokens.
+        """
         custom_punctuation = string.punctuation.replace('_', '')
         spaces = ' ' * len(custom_punctuation)
         translator = str.maketrans(custom_punctuation, spaces)
@@ -59,15 +79,26 @@ class BM25Methods:
 
     @staticmethod
     def calculate_avgdl(bm25s: BM25s) -> None:
+        """
+        Calculates the Average Document Length (avgdl) for the entire corpus.
+
+        Must be called after all documents have been processed.
+        """
         if bm25s.N_total == 0:
-            error_exit(f">>> {log_location}\n"
+            error_exit(f"{log_location()}\n"
                        f">>> Context: N_total=={bm25s.N_total}. Can't calculate 'avgdl (Average Document Length)'.")
         bm25s.avgdl = bm25s.total_dl / bm25s.N_total
 
     @staticmethod
     def calculate_idf(bm25s: BM25s) -> None:
+        """
+        Calculates the Inverse Document Frequency (IDF) for all unique tokens.
+
+        Applies smoothing to prevent negative IDF scores. Must be called after
+        all documents have been processed.
+        """
         if not bm25s.df:
-            error_exit(f">>> {log_location}\n"
+            error_exit(f"{log_location()}\n"
                        f">>> Context: df parameter is empty. Can't calculate 'idf (Inverse Document Frequency)'.")
 
         for word, df_value in bm25s.df.items():
@@ -80,6 +111,18 @@ class BM25Methods:
 
     @staticmethod
     def get_top_k(query: str, bm25s: BM25s, k: int) -> list[tuple[str, float]]:
+        """
+        Scores and retrieves the top-k document chunks for a given query.
+
+        Args:
+            query (str): The raw search query.
+            bm25s (BM25s): The populated BM25 statistics object.
+            k (int): The number of top-scoring chunks to return.
+
+        Returns:
+            list[tuple[str, float]]: A list containing tuples of chunk IDs and their
+                                     corresponding BM25 scores, sorted in descending order.
+        """
         query_tokens = BM25Methods.tokenize(query)
         uniq_query_tokens = set(query_tokens)
 

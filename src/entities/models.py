@@ -14,6 +14,12 @@ class MinimalSource(BaseModel):
 
 
 class IndexFile(BaseModel):
+    """
+    A container for storing all indexed document chunks.
+
+    Used to serialize and deserialize the entire corpus of MinimalSource
+    objects when saving to or loading from the disk.
+    """
     chunks: list[MinimalSource] = Field(default_factory=list)
 
 
@@ -29,7 +35,7 @@ class BM25Stat(BaseModel):
         b (float): Length normalization parameter (usually 0.75). Penalizes for document length.
         tf (dict[str, dict[str, int]]): Term Frequency. Inverted index in the format `word -> {document_ID: frequency}`.
         dl (dict[str, int]): Dictionary of lengths for each specific document, measured in words.
-        avgdl (float): средняя длина документа
+        avgdl (float): Average document length
         idf (dict[str, float]): Inverse Document Frequency
     """
     N_total: int = 0

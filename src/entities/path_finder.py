@@ -6,7 +6,10 @@ from dataclasses import dataclass, field
 @dataclass
 class PathFinder:
     """
-    Class for parsing files in directory
+    Recursively scans the target directory for .py and .md files.
+
+    Populates the path_map dictionary where keys are file extensions
+    and values are lists of corresponding Path objects.
     """
     target_dir: Path = Path()
     path_map: Dict[str, list[Path]] = field(default_factory=dict)
