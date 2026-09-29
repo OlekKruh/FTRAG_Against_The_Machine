@@ -2,6 +2,10 @@
 
 install:
 	@echo "=== Installing dependencies ==="
+	@if ! command -v uv >/dev/null 2>&1; then \
+		echo "uv not found. Installing via pip..."; \
+		pip install uv; \
+	fi
 	uv sync
 
 run:

@@ -26,8 +26,8 @@ class RAGPipeline:
         Args:
             max_chunk_size (int): Maximum character length for a single chunk.
         """
-        print(f"-> 'Index' command called.\n"
-              f"-> max_chunk_size = {max_chunk_size}")
+        # print(f"-> 'Index' command called.\n"
+        #       f"-> max_chunk_size = {max_chunk_size}")
 
         # === Activate objects ===
         pathfinder = PathFinder(Def_Con.raw_dir)
@@ -69,9 +69,9 @@ class RAGPipeline:
             query (str): The search prompt.
             k (int): The number of top results to return.
         """
-        print(f"-> 'Search' command called.\n"
-              f"-> Query = '{query}',\n"
-              f"-> k = {k}\n")
+        # print(f"-> 'Search' command called.\n"
+        #       f"-> Query = '{query}',\n"
+        #       f"-> k = {k}\n")
         index_file_path = Def_Con.processed_files_dir / Def_Con.index_file_name
         bm25s_file_path = Def_Con.processed_files_dir / Def_Con.bm25s_file_name
 
@@ -98,10 +98,10 @@ class RAGPipeline:
             save_directory (str): Directory where the search results will be saved.
             k (int): The number of chunks to retrieve per question.
         """
-        print(f"-> 'Search_dataset' command called.\n"
-              f"-> Dataset path = {dataset_path}\n"
-              f"-> Save directory = {save_directory}\n"
-              f"-> k = {k}")
+        # print(f"-> 'Search_dataset' command called.\n"
+        #       f"-> Dataset path = {dataset_path}\n"
+        #       f"-> Save directory = {save_directory}\n"
+        #       f"-> k = {k}")
 
         index_file_path = Def_Con.processed_files_dir / Def_Con.index_file_name
         bm25s_file_path = Def_Con.processed_files_dir / Def_Con.bm25s_file_name
@@ -153,9 +153,9 @@ class RAGPipeline:
             query (str): The user's question.
             k (int): The number of chunks to retrieve and use as context.
         """
-        print(f"-> 'Answer' command called.\n"
-              f"-> query = '{query}'\n"
-              f"-> k = {k}")
+        # print(f"-> 'Answer' command called.\n"
+        #       f"-> query = '{query}'\n"
+        #       f"-> k = {k}")
 
         llm_engine = LLMEngine()
         llm_engine.load_model()
@@ -189,9 +189,9 @@ class RAGPipeline:
             student_search_results_path (str): Path to the JSON containing search results.
             save_directory (str): Directory to save the final answers JSON.
         """
-        print(f"-> 'Answer_dataset' command called.\n"
-              f"-> results_path = {student_search_results_path}\n"
-              f"-> save_directory = {save_directory}")
+        # print(f"-> 'Answer_dataset' command called.\n"
+        #       f"-> results_path = {student_search_results_path}\n"
+        #       f"-> save_directory = {save_directory}")
 
         llm_engine = LLMEngine()
         llm_engine.load_model()
@@ -237,9 +237,9 @@ class RAGPipeline:
             student_search_results_path (str): Path to the generated search results.
             dataset_path (str): Path to the ground-truth dataset containing correct sources.
         """
-        print(f"-> 'Evaluate' command called.\n"
-              f"-> results_path = {student_search_results_path}\n"
-              f"-> dataset_path = {dataset_path}")
+        # print(f"-> 'Evaluate' command called.\n"
+        #       f"-> results_path = {student_search_results_path}\n"
+        #       f"-> dataset_path = {dataset_path}")
 
         # Читаем результаты поиска и эталонный датасет
         student_results = F_io.file_read_json(path=Path(student_search_results_path), obj=StSeRe)
@@ -286,8 +286,8 @@ class RAGPipeline:
                 correct_retrievals += 1
 
         recall = (correct_retrievals / total_questions) * 100 if total_questions > 0 else 0
-        print(f"Total questions evaluated: {total_questions}")
-        print(f"Recall@{student_results.k}: {recall:.2f}%")
+        print(f"-> Total questions evaluated: {total_questions}")
+        print(f"-> Recall@{student_results.k}: {recall:.2f}%")
 
 
 if __name__ == "__main__":
