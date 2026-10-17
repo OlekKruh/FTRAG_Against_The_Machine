@@ -1,5 +1,4 @@
 from pathlib import Path
-import sys
 from src.entities.BM25Builder import BM25Methods as BM25m
 from src.entities.models import MinimalSource, BM25Stat
 from src.utils.exits import error_exit
@@ -14,7 +13,7 @@ class Chunker:
     Utilizes LangChain's RecursiveCharacterTextSplitter to ensure semantic
     blocks (like functions or paragraphs) remain intact during splitting.
     """
-    def __init__(self, max_size) -> None:
+    def __init__(self, max_size: int) -> None:
         """
         Initializes the text splitters for supported file extensions.
 

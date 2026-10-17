@@ -3,7 +3,6 @@ from tqdm import tqdm
 from pathlib import Path
 from src.entities.BM25Builder import BM25Methods as BM25m
 from src.entities.chunker import Chunker
-from src.entities.cleaner import Cleaner
 from src.entities.config import DefaultConfig as Def_Con
 from src.entities.file_io import FileIO as F_io
 from src.entities.llm_engine import LLMEngine
@@ -96,11 +95,6 @@ class RAGPipeline:
             save_directory (str): Directory where the search results will be saved.
             k (int): The number of chunks to retrieve per question.
         """
-        # print(f"-> 'Search_dataset' command called.\n"
-        #       f"-> Dataset path = {dataset_path}\n"
-        #       f"-> Save directory = {save_directory}\n"
-        #       f"-> k = {k}")
-
         index_file_path = Def_Con.processed_files_dir / Def_Con.index_file_name
         bm25s_file_path = Def_Con.processed_files_dir / Def_Con.bm25s_file_name
 
@@ -151,10 +145,6 @@ class RAGPipeline:
             query (str): The user's question.
             k (int): The number of chunks to retrieve and use as context.
         """
-        # print(f"-> 'Answer' command called.\n"
-        #       f"-> query = '{query}'\n"
-        #       f"-> k = {k}")
-
         llm_engine = LLMEngine()
         llm_engine.load_model()
 
@@ -187,10 +177,6 @@ class RAGPipeline:
             student_search_results_path (str): Path to the JSON containing search results.
             save_directory (str): Directory to save the final answers JSON.
         """
-        # print(f"-> 'Answer_dataset' command called.\n"
-        #       f"-> results_path = {student_search_results_path}\n"
-        #       f"-> save_directory = {save_directory}")
-
         llm_engine = LLMEngine()
         llm_engine.load_model()
 
@@ -251,15 +237,12 @@ class RAGPipeline:
 
         for student_q in student_results.search_results:
             truth_q = truth_dict.get(student_q.question_id)
-            # Если для вопроса нет эталонных ответов, пропускаем
             if not truth_q or not truth_q.sources:
                 continue
 
             found_sources = 0
-            # Ограничиваем выборку топ K результатами, если вдруг их пришло больше
             top_k_retrieved = student_q.retrieved_sources[:student_results.k]
 
-            # Проходим по каждому ЭТАЛОННОМУ куску и ищем, покрыл ли его студент
             for truth_source in truth_q.sources:
                 for student_source in top_k_retrieved:
                     if student_source.file_path == truth_source.file_path:
@@ -269,12 +252,10 @@ class RAGPipeline:
                             truth_source.first_character_index,
                             truth_source.last_character_index
                         )
-                        # Если покрыли хотя бы 5% эталона, засчитываем этот кусок
                         if coverage >= 0.05:
                             found_sources += 1
-                            break  # Переходим к следующему эталонному куску
+                            break
 
-            # Считаем частичный балл за вопрос (например, нашли 2 из 3 нужных = 0.66)
             question_score = found_sources / len(truth_q.sources)
             total_score += question_score
 
@@ -283,85 +264,6 @@ class RAGPipeline:
         print(f"-> Total questions evaluated: {total_questions}")
         print(f"-> Recall@{student_results.k}: {recall:.2f}%")
 
-    def test_cleaners(self) -> None:
-        """
-        Runs a debug loop to test text cleaning and tokenization
-        for .py, .md, and queries.
-        """
-        test_cases = [
-            # --- ТЕСТЫ ДЛЯ PYTHON ---
-            ("py", "NUM_REQS = 3\nTEXT = 'a'"),
-            ("py", "assert iteration_stats.num_prompt_tokens == total_prompt_tokens"),
-            ("py", "class HTTPRequestHandler(BaseHandler):\n    def getOutputs(self): pass"),
-            ("py", "NVML_FI_DEV_NVLINK_RECOVERY_ERROR_COUNT_TOTAL = 1"),
-
-            # --- ТЕСТЫ ДЛЯ MARKDOWN ---
-            ("md", "For more info, see the `dataset_docs.md` file (vLLM-0.10.1)."),
-            ("md", "The openai_server_config controls the API endpoints."),
-            ("md", "Check the HTTPResponse in the [documentation](http://vllm.ai/docs)."),
-
-            # --- ТЕСТЫ ДЛЯ ЗАПРОСОВ (QUERY) ---
-            ("query", "What is the constant value for NVML_FI_DEV_NVLINK in vLLM's module?"),
-            ("query", "How to getOutputs from HTTPRequestHandler?")
-        ]
-
-        print("=" * 60)
-        print("🧹 ЗАПУСК ТЕСТОВ ОЧИСТКИ (CLEANERS)")
-        print("=" * 60)
-
-        for doc_type, text in test_cases:
-            print(f"\n[{doc_type.upper()}] ORIGINAL: {text}")
-
-            if doc_type == "py":
-                result = Cleaner.clean_python(text)
-            elif doc_type == "md":
-                result = Cleaner.clean_markdown(text)
-            else:
-                result = Cleaner.clean_query(text)
-
-            print(f"[{doc_type.upper()}] RESULT:   {result}")
-
-    def debug_search(self) -> None:
-        """
-        Прогоняет индексацию по разным размерам и показывает,
-        как обрабатывается сложный запрос и что именно мы достаем.
-        """
-        tricky_query = (
-            "How do I start the OpenAI compatible server in vLLM? "
-            "What endpoints are available for chat completions and how do I pass generation parameters like temperature?"
-        )
-
-        print("\n" + "=" * 70)
-        print(f"🔥 ОРИГИНАЛЬНЫЙ ЗАПРОС:\n{tricky_query}")
-        clean_q = Cleaner.clean_query(tricky_query)
-        print(f"🔪 ОЧИЩЕННЫЙ ЗАПРОС (токены, которые ищет BM25):\n{clean_q}")
-        print("=" * 70)
-
-        chunk_sizes = [500, 800, 1100, 1400, 1700, 2000]
-
-        for size in chunk_sizes:
-            print(f"\n\n⚙️ ИНДЕКСАЦИЯ С РАЗМЕРОМ ЧАНКА: {size}")
-            # Подавляем вывод tqdm в index, чтобы не мусорить в консоли
-            self.index(max_chunk_size=size)
-
-            index_file_path = Def_Con.processed_files_dir / Def_Con.index_file_name
-            bm25s_file_path = Def_Con.processed_files_dir / Def_Con.bm25s_file_name
-
-            index_obj = F_io.file_read_json(path=index_file_path, obj=IndexFile)
-            bm25s_obj = F_io.file_read_json(path=bm25s_file_path, obj=BM25Stat)
-
-            # Берем топ-2, чтобы не перегружать терминал
-            top_results = BM25m.get_top_k(query=tricky_query, bm25s=bm25s_obj, k=5)
-
-            for i, (chunk_id, score) in enumerate(top_results, 1):
-                source = index_obj.chunks[int(chunk_id)]
-                raw_text = F_io.file_read(Path(source.file_path))
-                chunk_text = raw_text[source.first_character_index:source.last_character_index]
-
-                print(f"\n--- 🏆 ТОП {i} (Score: {score:.4f}) ---")
-                # print(f"📁 Файл: {source.file_path} [{source.first_character_index}:{source.last_character_index}]")
-                # print(f"📝 Текст:\n{chunk_text.strip()}")
-                # print("-" * 50)
 
 if __name__ == "__main__":
     fire.Fire(RAGPipeline)
