@@ -42,8 +42,8 @@ class BM25Stat(BaseModel):
     total_dl: int = 0
     df: dict[str, int] = Field(default_factory=dict)
 
-    k1: float = 1.5
-    b: float = 0.75
+    k1: float = 1.2
+    b: float = 0.5
 
     tf: dict[str, dict[str, int]] = Field(default_factory=lambda: defaultdict(dict))
     dl: dict[str, int] = Field(default_factory=dict)

@@ -1,6 +1,8 @@
+import heapq
 import math
-import string
 from collections import Counter
+
+from src.entities.cleaner import Cleaner
 from src.entities.models import BM25Stat as BM25s
 from src.utils.log_location import log_location
 from src.utils.exits import error_exit
@@ -12,15 +14,16 @@ class BM25Methods:
     Provides static methods to build and query a BM25 sparse retrieval index.
     """
     @staticmethod
-    def despatch_bm25_stat(text: str, bm25s: BM25s) -> None:
+    def despatch_bm25_stat(text: str, bm25s: BM25s, ext: str = "") -> None:
         """
         Processes a raw text chunk and updates the global BM25 statistics.
 
         Args:
             text (str): The raw text content of the chunk.
             bm25s (BM25s): The BM25 statistics dataclass to update.
+            ext (str): File extension
         """
-        tokens = BM25Methods.tokenize(text)
+        tokens = BM25Methods.tokenize(text, ext)
         tokens_freq = BM25Methods._count_frequencies(tokens)
         word_quan = len(tokens)
         chunk_id = str(bm25s.N_total)
@@ -32,23 +35,19 @@ class BM25Methods:
         BM25Methods._update_dl(word_quan=word_quan, chunk_id=chunk_id, bm25s=bm25s)
 
     @staticmethod
-    def tokenize(text: str) -> list[str]:
+    def tokenize(text: str, ext: str = "") -> list[str]:
         """
-        Cleans and tokenizes text by removing punctuation (except underscores),
-        converting to lowercase, and splitting by whitespace.
-
-        Args:
-            text (str): The raw text to tokenize.
-
-        Returns:
-            list[str]: A list of cleaned, lowercase tokens.
+        Routes text through the appropriate cleaner based on file extension,
+        then simply splits it into tokens.
         """
-        custom_punctuation = string.punctuation.replace('_', '')
-        spaces = ' ' * len(custom_punctuation)
-        translator = str.maketrans(custom_punctuation, spaces)
-        clean_text = text.translate(translator).lower()
-        tokens = clean_text.split()
-        return tokens
+        if ext == ".py":
+            clean_str = Cleaner.clean_python(text)
+        elif ext == ".md":
+            clean_str = Cleaner.clean_markdown(text)
+        else:
+            clean_str = Cleaner.clean_query(text)
+
+        return clean_str.split()
 
     @staticmethod
     def _count_frequencies(tokens: list[str]) -> dict[str, int]:
@@ -141,5 +140,5 @@ class BM25Methods:
                 denominator = tf + bm25s.k1 * (1 - bm25s.b + bm25s.b * (dl / bm25s.avgdl))
                 score = weight_idf * (numerator / denominator)
                 scores[chunk_id] += score
-        res = sorted(scores.items(), key=lambda item: item[1], reverse=True)[:k]
+        res = heapq.nlargest(k, scores.items(), key=lambda item: item[1])
         return res

@@ -1,4 +1,5 @@
 from pathlib import Path
+import sys
 from src.entities.BM25Builder import BM25Methods as BM25m
 from src.entities.models import MinimalSource, BM25Stat
 from src.utils.exits import error_exit
@@ -13,19 +14,31 @@ class Chunker:
     Utilizes LangChain's RecursiveCharacterTextSplitter to ensure semantic
     blocks (like functions or paragraphs) remain intact during splitting.
     """
-    def __init__(self, max_size: int = 2000) -> None:
+    def __init__(self, max_size) -> None:
         """
         Initializes the text splitters for supported file extensions.
 
         Args:
             max_size (int): The maximum allowed character length for a single chunk.
         """
+
+        py_size = max(500, min(max_size, 2000))
+        md_size = max(200, min(max_size, 2000))
+
+        print(f"-> [DEBUG] Input: {max_size} | py_size: {py_size} | md_size: {md_size}")
+
         self.splitters = {
             ".py": RecursiveCharacterTextSplitter.from_language(
-                language=Language.PYTHON, chunk_size=max_size, chunk_overlap=0, add_start_index=True,
+                language=Language.PYTHON,
+                chunk_size=py_size,
+                chunk_overlap=0,
+                add_start_index=True,
             ),
             ".md": RecursiveCharacterTextSplitter.from_language(
-                language=Language.MARKDOWN, chunk_size=max_size, chunk_overlap=0, add_start_index=True,
+                language=Language.MARKDOWN,
+                chunk_size=md_size,
+                chunk_overlap=200,
+                add_start_index=True,
             )
         }
 
@@ -50,7 +63,7 @@ class Chunker:
             error_exit(f"{log_location()}\n"
                        f">>> Context: Have no suitable method for '{ext}'")
 
-        docs = splitter.create_documents([raw_text])  # грызем текст
+        docs = splitter.create_documents([raw_text])
 
         for i, doc in enumerate(docs):
             start_pos = doc.metadata["start_index"]
@@ -62,6 +75,6 @@ class Chunker:
                 last_character_index=end_pos,
             ))
 
-            BM25m.despatch_bm25_stat(doc.page_content, bm25s)
+            BM25m.despatch_bm25_stat(doc.page_content, bm25s, ext)
 
         return res_obj_list

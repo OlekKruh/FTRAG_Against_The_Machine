@@ -1,4 +1,4 @@
-.PHONY: install run debug clean lint test
+.PHONY: install run debug clean lint test test_chunks debug-search
 
 install:
 	@echo "=== Installing dependencies ==="
@@ -16,12 +16,12 @@ run:
 	@echo "\n=== 2. Processing DOCS Dataset ==="
 	uv run python -m src search_dataset --dataset_path data/datasets/UnansweredQuestions/dataset_docs_public.json --save_directory data/output/search_results/UnansweredQuestions --k 5
 	uv run python -m src evaluate --student_search_results_path data/output/search_results/UnansweredQuestions/dataset_docs_public.json --dataset_path data/datasets/AnsweredQuestions/dataset_docs_public.json
-	uv run python -m src answer_dataset --student_search_results_path data/output/search_results/UnansweredQuestions/dataset_docs_public.json --save_directory data/output/search_results_and_answer/UnansweredQuestions
+	# uv run python -m src answer_dataset --student_search_results_path data/output/search_results/UnansweredQuestions/dataset_docs_public.json --save_directory data/output/search_results_and_answer/UnansweredQuestions
 
 	@echo "\n=== 3. Processing CODE Dataset ==="
 	uv run python -m src search_dataset --dataset_path data/datasets/UnansweredQuestions/dataset_code_public.json --save_directory data/output/search_results/UnansweredQuestions --k 5
 	uv run python -m src evaluate --student_search_results_path data/output/search_results/UnansweredQuestions/dataset_code_public.json --dataset_path data/datasets/AnsweredQuestions/dataset_code_public.json
-	uv run python -m src answer_dataset --student_search_results_path data/output/search_results/UnansweredQuestions/dataset_code_public.json --save_directory data/output/search_results_and_answer/UnansweredQuestions
+	# uv run python -m src answer_dataset --student_search_results_path data/output/search_results/UnansweredQuestions/dataset_code_public.json --save_directory data/output/search_results_and_answer/UnansweredQuestions
 
 debug:
 	@echo "Running RAG in debug mode..."
@@ -42,7 +42,36 @@ lint:
 
 test:
 	@echo "=== Testing DOCS with Moulinette ==="
-	./moulinette evaluate_student_search_results data/output/search_results/UnansweredQuestions/dataset_docs_public.json data/datasets/AnsweredQuestions/dataset_docs_public.json --k 5 --max_context_length 2000
+	./moulinette/moulinette-ubuntu evaluate_student_search_results data/output/search_results/UnansweredQuestions/dataset_docs_public.json data/datasets/AnsweredQuestions/dataset_docs_public.json --k 5 --max_context_length 800
 
 	@echo "\n=== Testing CODE with Moulinette ==="
-	./moulinette evaluate_student_search_results data/output/search_results/UnansweredQuestions/dataset_code_public.json data/datasets/AnsweredQuestions/dataset_code_public.json --k 5 --max_context_length 2000
+	./moulinette/moulinette-ubuntu evaluate_student_search_results data/output/search_results/UnansweredQuestions/dataset_code_public.json data/datasets/AnsweredQuestions/dataset_code_public.json --k 5 --max_context_length 800
+
+pipe:
+	$(MAKE) run
+	$(MAKE) test
+
+test_chunks:
+	@for size in $$(seq 300 100 2000); do \
+		echo "\n========================================"; \
+		echo "Testing chunk size: $$size"; \
+		echo "========================================"; \
+		uv run python -m src index --max_chunk_size $$size 2> /dev/null; \
+		\
+		echo "--- DOCS T5 ---"; \
+		uv run python -m src search_dataset --dataset_path data/datasets/UnansweredQuestions/dataset_docs_public.json --save_directory data/output/search_results/UnansweredQuestions --k 5 > /dev/null 2>&1; \
+		uv run python -m src evaluate --student_search_results_path data/output/search_results/UnansweredQuestions/dataset_docs_public.json --dataset_path data/datasets/AnsweredQuestions/dataset_docs_public.json; \
+		echo "--- DOCS T10 ---"; \
+		uv run python -m src search_dataset --dataset_path data/datasets/UnansweredQuestions/dataset_docs_public.json --save_directory data/output/search_results/UnansweredQuestions --k 10 > /dev/null 2>&1; \
+		uv run python -m src evaluate --student_search_results_path data/output/search_results/UnansweredQuestions/dataset_docs_public.json --dataset_path data/datasets/AnsweredQuestions/dataset_docs_public.json; \
+		\
+		echo "--- CODE T5 ---"; \
+		uv run python -m src search_dataset --dataset_path data/datasets/UnansweredQuestions/dataset_code_public.json --save_directory data/output/search_results/UnansweredQuestions --k 5 > /dev/null 2>&1; \
+		uv run python -m src evaluate --student_search_results_path data/output/search_results/UnansweredQuestions/dataset_code_public.json --dataset_path data/datasets/AnsweredQuestions/dataset_code_public.json; \
+		echo "--- CODE T10 ---"; \
+		uv run python -m src search_dataset --dataset_path data/datasets/UnansweredQuestions/dataset_code_public.json --save_directory data/output/search_results/UnansweredQuestions --k 10 > /dev/null 2>&1; \
+		uv run python -m src evaluate --student_search_results_path data/output/search_results/UnansweredQuestions/dataset_code_public.json --dataset_path data/datasets/AnsweredQuestions/dataset_code_public.json; \
+	done
+
+debug-search:
+	uv run python -m src debug_search
