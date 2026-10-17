@@ -11,7 +11,7 @@ install:
 run:
 	@echo "Running RAG..."
 	@echo "=== 1. Indexing Corpus ==="
-	uv run python -m src index --max_chunk_size 2000
+	uv run python -m src index --max_chunk_size 800
 
 	@echo "\n=== 2. Processing DOCS Dataset ==="
 	uv run python -m src search_dataset --dataset_path data/datasets/UnansweredQuestions/dataset_docs_public.json --save_directory data/output/search_results/UnansweredQuestions --k 5
@@ -52,7 +52,7 @@ pipe:
 	$(MAKE) test
 
 test_chunks:
-	@for size in $$(seq 300 100 2000); do \
+	@for size in $$(seq 600 100 1500); do \
 		echo "\n========================================"; \
 		echo "Testing chunk size: $$size"; \
 		echo "========================================"; \
@@ -61,15 +61,9 @@ test_chunks:
 		echo "--- DOCS T5 ---"; \
 		uv run python -m src search_dataset --dataset_path data/datasets/UnansweredQuestions/dataset_docs_public.json --save_directory data/output/search_results/UnansweredQuestions --k 5 > /dev/null 2>&1; \
 		uv run python -m src evaluate --student_search_results_path data/output/search_results/UnansweredQuestions/dataset_docs_public.json --dataset_path data/datasets/AnsweredQuestions/dataset_docs_public.json; \
-		echo "--- DOCS T10 ---"; \
-		uv run python -m src search_dataset --dataset_path data/datasets/UnansweredQuestions/dataset_docs_public.json --save_directory data/output/search_results/UnansweredQuestions --k 10 > /dev/null 2>&1; \
-		uv run python -m src evaluate --student_search_results_path data/output/search_results/UnansweredQuestions/dataset_docs_public.json --dataset_path data/datasets/AnsweredQuestions/dataset_docs_public.json; \
 		\
 		echo "--- CODE T5 ---"; \
 		uv run python -m src search_dataset --dataset_path data/datasets/UnansweredQuestions/dataset_code_public.json --save_directory data/output/search_results/UnansweredQuestions --k 5 > /dev/null 2>&1; \
-		uv run python -m src evaluate --student_search_results_path data/output/search_results/UnansweredQuestions/dataset_code_public.json --dataset_path data/datasets/AnsweredQuestions/dataset_code_public.json; \
-		echo "--- CODE T10 ---"; \
-		uv run python -m src search_dataset --dataset_path data/datasets/UnansweredQuestions/dataset_code_public.json --save_directory data/output/search_results/UnansweredQuestions --k 10 > /dev/null 2>&1; \
 		uv run python -m src evaluate --student_search_results_path data/output/search_results/UnansweredQuestions/dataset_code_public.json --dataset_path data/datasets/AnsweredQuestions/dataset_code_public.json; \
 	done
 

@@ -43,7 +43,7 @@ class BM25Stat(BaseModel):
     df: dict[str, int] = Field(default_factory=dict)
 
     k1: float = 1.2
-    b: float = 0.5
+    b: float = 0.75
 
     tf: dict[str, dict[str, int]] = Field(default_factory=lambda: defaultdict(dict))
     dl: dict[str, int] = Field(default_factory=dict)

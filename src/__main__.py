@@ -16,7 +16,7 @@ from src.entities.models import StudentSearchResults as StSeRe
 
 
 class RAGPipeline:
-    def index(self, max_chunk_size: int = 1100) -> None:
+    def index(self, max_chunk_size: int = 800) -> None:
         """
         Parses raw data and builds the BM25 index.
 
@@ -227,63 +227,59 @@ class RAGPipeline:
     def evaluate(self, student_search_results_path: str, dataset_path: str) -> None:
         """
         Locally evaluates search accuracy (Recall@k) against a ground-truth dataset.
-
-        Uses Intersection over Union (IoU >= 0.05) on character indices to determine
-        if a retrieved chunk successfully matches the expected source document.
-
-        Args:
-            student_search_results_path (str): Path to the generated search results.
-            dataset_path (str): Path to the ground-truth dataset containing correct sources.
+        Uses Coverage (intersection / truth_length >= 0.05) to determine matches.
         """
-        # print(f"-> 'Evaluate' command called.\n"
-        #       f"-> results_path = {student_search_results_path}\n"
-        #       f"-> dataset_path = {dataset_path}")
-
-        # Читаем результаты поиска и эталонный датасет
         student_results = F_io.file_read_json(path=Path(student_search_results_path), obj=StSeRe)
         ground_truth = F_io.file_read_json(path=Path(dataset_path), obj=RagData)
 
-        # Собираем словарь правильных ответов для быстрого поиска по question_id
         truth_dict = {q.question_id: q for q in ground_truth.rag_questions if hasattr(q, 'sources')}
 
-        def calculate_iou(start_a: int, end_a: int, start_b: int, end_b: int) -> float:
+        def calculate_coverage(start_a: int, end_a: int, start_b: int, end_b: int) -> float:
+            """
+            Возвращает процент покрытия эталона: (Пересечение / Длина эталона)
+            _a - найденный чанк (retrieved), _b - эталон (truth)
+            """
+            truth_len = max(1, end_b - start_b)
             intersection_start = max(start_a, start_b)
             intersection_end = min(end_a, end_b)
             intersection = max(0, intersection_end - intersection_start)
 
-            union = (end_a - start_a) + (end_b - start_b) - intersection
-            return intersection / union if union > 0 else 0.0
+            return intersection / truth_len
 
-        correct_retrievals = 0
+        total_score = 0.0
         total_questions = len(student_results.search_results)
 
         for student_q in student_results.search_results:
             truth_q = truth_dict.get(student_q.question_id)
-            if not truth_q:
+            # Если для вопроса нет эталонных ответов, пропускаем
+            if not truth_q or not truth_q.sources:
                 continue
 
-            found_match = False
-            for student_source in student_q.retrieved_sources:
-                for truth_source in truth_q.sources:
-                    # Совпадение пути к файлу проверяется точным совпадением строк
+            found_sources = 0
+            # Ограничиваем выборку топ K результатами, если вдруг их пришло больше
+            top_k_retrieved = student_q.retrieved_sources[:student_results.k]
+
+            # Проходим по каждому ЭТАЛОННОМУ куску и ищем, покрыл ли его студент
+            for truth_source in truth_q.sources:
+                for student_source in top_k_retrieved:
                     if student_source.file_path == truth_source.file_path:
-                        iou = calculate_iou(
+                        coverage = calculate_coverage(
                             student_source.first_character_index,
                             student_source.last_character_index,
                             truth_source.first_character_index,
                             truth_source.last_character_index
                         )
-                        # Пересечение должно составлять хотя бы 5% (IoU >= 0.05)[cite: 1]
-                        if iou >= 0.05:
-                            found_match = True
-                            break
-                if found_match:
-                    break
+                        # Если покрыли хотя бы 5% эталона, засчитываем этот кусок
+                        if coverage >= 0.05:
+                            found_sources += 1
+                            break  # Переходим к следующему эталонному куску
 
-            if found_match:
-                correct_retrievals += 1
+            # Считаем частичный балл за вопрос (например, нашли 2 из 3 нужных = 0.66)
+            question_score = found_sources / len(truth_q.sources)
+            total_score += question_score
 
-        recall = (correct_retrievals / total_questions) * 100 if total_questions > 0 else 0
+        recall = (total_score / total_questions) * 100 if total_questions > 0 else 0
+
         print(f"-> Total questions evaluated: {total_questions}")
         print(f"-> Recall@{student_results.k}: {recall:.2f}%")
 
@@ -341,7 +337,7 @@ class RAGPipeline:
         print(f"🔪 ОЧИЩЕННЫЙ ЗАПРОС (токены, которые ищет BM25):\n{clean_q}")
         print("=" * 70)
 
-        chunk_sizes = [1500]
+        chunk_sizes = [500, 800, 1100, 1400, 1700, 2000]
 
         for size in chunk_sizes:
             print(f"\n\n⚙️ ИНДЕКСАЦИЯ С РАЗМЕРОМ ЧАНКА: {size}")
@@ -355,7 +351,7 @@ class RAGPipeline:
             bm25s_obj = F_io.file_read_json(path=bm25s_file_path, obj=BM25Stat)
 
             # Берем топ-2, чтобы не перегружать терминал
-            top_results = BM25m.get_top_k(query=tricky_query, bm25s=bm25s_obj, k=2)
+            top_results = BM25m.get_top_k(query=tricky_query, bm25s=bm25s_obj, k=5)
 
             for i, (chunk_id, score) in enumerate(top_results, 1):
                 source = index_obj.chunks[int(chunk_id)]
@@ -363,9 +359,9 @@ class RAGPipeline:
                 chunk_text = raw_text[source.first_character_index:source.last_character_index]
 
                 print(f"\n--- 🏆 ТОП {i} (Score: {score:.4f}) ---")
-                print(f"📁 Файл: {source.file_path} [{source.first_character_index}:{source.last_character_index}]")
-                print(f"📝 Текст:\n{chunk_text.strip()}")
-                print("-" * 50)
+                # print(f"📁 Файл: {source.file_path} [{source.first_character_index}:{source.last_character_index}]")
+                # print(f"📝 Текст:\n{chunk_text.strip()}")
+                # print("-" * 50)
 
 if __name__ == "__main__":
     fire.Fire(RAGPipeline)
