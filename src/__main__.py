@@ -15,20 +15,23 @@ from src.entities.models import StudentSearchResults as StSeRe
 
 
 class RAGPipeline:
+    """
+    Main pipeline for the RAG (Retrieval-Augmented Generation) system.
+    Provides CLI commands for indexing documents, searching, generating answers,
+    and evaluating retrieval metrics.
+    """
     def index(self, max_chunk_size: int = 800) -> None:
         """
         Parses raw data and builds the BM25 index.
 
         Scans the raw directory for valid files, splits them into chunks
         based on max_chunk_size, calculates BM25 statistics, and saves
-        the processed index to the disk.
+        the processed index and statistics to the disk.
 
         Args:
             max_chunk_size (int): Maximum character length for a single chunk.
+                                  Defaults to 800.
         """
-        # print(f"-> 'Index' command called.\n"
-        #       f"-> max_chunk_size = {max_chunk_size}")
-
         # === Activate objects ===
         pathfinder = PathFinder(Def_Con.raw_dir)
         chunker = Chunker(max_chunk_size)
@@ -66,8 +69,8 @@ class RAGPipeline:
         Retrieves and prints the top-k document chunks for a single search query.
 
         Args:
-            query (str): The search prompt.
-            k (int): The number of top results to return.
+            query (str): The search prompt entered by the user.
+            k (int): The number of top results to retrieve. Defaults to 5.
         """
         index_file_path = Def_Con.processed_files_dir / Def_Con.index_file_name
         bm25s_file_path = Def_Con.processed_files_dir / Def_Con.bm25s_file_name
@@ -93,7 +96,7 @@ class RAGPipeline:
         Args:
             dataset_path (str): Path to the input dataset JSON.
             save_directory (str): Directory where the search results will be saved.
-            k (int): The number of chunks to retrieve per question.
+            k (int): The number of chunks to retrieve per question. Defaults to 5.
         """
         index_file_path = Def_Con.processed_files_dir / Def_Con.index_file_name
         bm25s_file_path = Def_Con.processed_files_dir / Def_Con.bm25s_file_name
@@ -143,7 +146,7 @@ class RAGPipeline:
 
         Args:
             query (str): The user's question.
-            k (int): The number of chunks to retrieve and use as context.
+            k (int): The number of chunks to retrieve and use as context. Defaults to 5.
         """
         llm_engine = LLMEngine()
         llm_engine.load_model()
@@ -213,7 +216,13 @@ class RAGPipeline:
     def evaluate(self, student_search_results_path: str, dataset_path: str) -> None:
         """
         Locally evaluates search accuracy (Recall@k) against a ground-truth dataset.
-        Uses Coverage (intersection / truth_length >= 0.05) to determine matches.
+
+        Uses Coverage (intersection / truth_length >= 0.05) to determine if a
+        retrieved chunk successfully matches the expected source document.
+
+        Args:
+            student_search_results_path (str): Path to the generated search results JSON.
+            dataset_path (str): Path to the ground-truth dataset containing correct sources.
         """
         student_results = F_io.file_read_json(path=Path(student_search_results_path), obj=StSeRe)
         ground_truth = F_io.file_read_json(path=Path(dataset_path), obj=RagData)
@@ -222,8 +231,16 @@ class RAGPipeline:
 
         def calculate_coverage(start_a: int, end_a: int, start_b: int, end_b: int) -> float:
             """
-            Возвращает процент покрытия эталона: (Пересечение / Длина эталона)
-            _a - найденный чанк (retrieved), _b - эталон (truth)
+            Calculates the percentage of the ground-truth text covered by the retrieved chunk.
+
+            Args:
+                start_a (int): Start index of the retrieved chunk.
+                end_a (int): End index of the retrieved chunk.
+                start_b (int): Start index of the ground-truth chunk.
+                end_b (int): End index of the ground-truth chunk.
+
+            Returns:
+                float: The coverage ratio (Intersection / Truth Length).
             """
             truth_len = max(1, end_b - start_b)
             intersection_start = max(start_a, start_b)

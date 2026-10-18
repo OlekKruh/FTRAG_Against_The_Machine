@@ -2,7 +2,12 @@ import re
 
 
 class Cleaner:
-    # Единый список стоп-слов для кода и текста
+    """
+    Provides unified text cleaning and tokenization methods for the BM25 index.
+
+    Applies aggressive splitting on non-alphanumeric characters and CamelCase
+    boundaries, while filtering out common stop words and single-character noise.
+    """
     STOP_WORDS = {
         "a", "an", "the", "is", "are", "in", "on", "of", "to", "for", "with",
         "and", "or", "not", "that", "this", "it", "as", "at", "by", "from", "can", "be",
@@ -10,16 +15,20 @@ class Cleaner:
         "we", "you", "your", "def", "self", "class", "return", "import", "pass"
     }
 
-    # Жестко рубим по всему, что не является буквой или цифрой
     SPLIT_RE = re.compile(r"[^A-Za-z0-9]+")
-    # Идеальное разбиение CamelCase с учетом цифр
     CAMEL_RE = re.compile(r"(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])")
 
     @staticmethod
     def clean_text(text: str) -> str:
         """
-        Универсальный метод очистки: агрессивно дробит текст на атомы,
-        удаляет мусор, стоп-слова и одиночные символы.
+        Aggressively splits text into atomic tokens using regex boundaries,
+        converts them to lowercase, and removes stop words and single characters.
+
+        Args:
+            text (str): The raw text to be cleaned and tokenized.
+
+        Returns:
+            str: A space-separated string of cleaned tokens.
         """
         if not text:
             return ""
@@ -31,12 +40,9 @@ class Cleaner:
             if not part:
                 continue
 
-            # Добиваем CamelCase внутри каждого куска
             for sub in Cleaner.CAMEL_RE.split(part):
                 sub_lower = sub.lower()
 
-                # Возвращаем фильтр коротких слов, так как агрессивный SPLIT_RE
-                # порождает много одиночного мусора
                 if len(sub_lower) < 2:
                     continue
                 if sub_lower in Cleaner.STOP_WORDS:
@@ -46,15 +52,45 @@ class Cleaner:
 
         return " ".join(tokens)
 
-    # Перенаправляем все вызовы из BM25Builder в единый метод
     @staticmethod
     def clean_python(text: str) -> str:
+        """
+        Cleans and tokenizes Python source code.
+        Routes to the unified clean_text method.
+
+        Args:
+            text (str): Raw Python code or docstrings.
+
+        Returns:
+            str: Cleaned tokens.
+        """
         return Cleaner.clean_text(text)
 
     @staticmethod
     def clean_markdown(text: str) -> str:
+        """
+        Cleans and tokenizes Markdown documentation.
+        Routes to the unified clean_text method.
+
+        Args:
+            text (str): Raw Markdown text.
+
+        Returns:
+            str: Cleaned tokens.
+        """
         return Cleaner.clean_text(text)
 
     @staticmethod
     def clean_query(text: str) -> str:
+        """
+        Cleans and tokenizes the user's search query.
+        Routes to the unified clean_text method to ensure token symmetry
+        with the indexed documents.
+
+        Args:
+            text (str): The raw search query.
+
+        Returns:
+            str: Cleaned tokens.
+        """
         return Cleaner.clean_text(text)

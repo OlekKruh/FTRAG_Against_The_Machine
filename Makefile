@@ -52,7 +52,7 @@ pipe:
 	$(MAKE) test
 
 test_chunks:
-	@for size in $$(seq 600 100 1500); do \
+	@for size in $$(seq 600 100 2000); do \
 		echo "\n========================================"; \
 		echo "Testing chunk size: $$size"; \
 		echo "========================================"; \
@@ -67,5 +67,5 @@ test_chunks:
 		uv run python -m src evaluate --student_search_results_path data/output/search_results/UnansweredQuestions/dataset_code_public.json --dataset_path data/datasets/AnsweredQuestions/dataset_code_public.json; \
 	done
 
-debug-search:
-	uv run python -m src debug_search
+# debug-search:
+# 	uv run python -m src debug_search

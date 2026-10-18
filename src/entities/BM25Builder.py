@@ -21,7 +21,7 @@ class BM25Methods:
         Args:
             text (str): The raw text content of the chunk.
             bm25s (BM25s): The BM25 statistics dataclass to update.
-            ext (str): File extension
+            ext (str, optional): The file extension used to route text to the correct cleaner. Defaults to "".
         """
         tokens = BM25Methods.tokenize(text, ext)
         tokens_freq = BM25Methods._count_frequencies(tokens)
@@ -38,7 +38,14 @@ class BM25Methods:
     def tokenize(text: str, ext: str = "") -> list[str]:
         """
         Routes text through the appropriate cleaner based on file extension,
-        then simply splits it into tokens.
+        then splits it into tokens.
+
+        Args:
+            text (str): The raw text to tokenize.
+            ext (str, optional): The file extension (e.g., '.py', '.md'). Defaults to "".
+
+        Returns:
+            list[str]: A list of cleaned tokens.
         """
         if ext == ".py":
             clean_str = Cleaner.clean_python(text)
@@ -51,37 +58,87 @@ class BM25Methods:
 
     @staticmethod
     def _count_frequencies(tokens: list[str]) -> dict[str, int]:
+        """
+        Counts the frequency of each token in a given list.
+
+        Args:
+            tokens (list[str]): A list of string tokens.
+
+        Returns:
+            dict[str, int]: A dictionary mapping each token to its frequency count.
+        """
         return dict(Counter(tokens))
 
     @staticmethod
     def _update_n_total(bm25s: BM25s) -> None:
+        """
+        Increments the total document count in the BM25 statistics.
+
+        Args:
+            bm25s (BM25s): The BM25 statistics object.
+        """
         bm25s.N_total += 1
 
     @staticmethod
     def _update_total_dl(bm25s: BM25s, word_quan: int) -> None:
+        """
+        Adds the current document's length to the total corpus length.
+
+        Args:
+            bm25s (BM25s): The BM25 statistics object.
+            word_quan (int): The number of tokens in the current document.
+        """
         bm25s.total_dl += word_quan
 
     @staticmethod
     def _update_df(tokens: list[str], bm25s: BM25s) -> None:
+        """
+        Updates the Document Frequency (DF) for each unique token in the document.
+
+        Args:
+            tokens (list[str]): A list of tokens from a single document.
+            bm25s (BM25s): The BM25 statistics object.
+        """
         tokens_set = set(tokens)
         for word in tokens_set:
             bm25s.df[word] = bm25s.df.get(word, 0) + 1
 
     @staticmethod
     def _update_tf(tokens_freq: dict[str, int], chunk_id: str, bm25s: BM25s) -> None:
+        """
+        Records the Term Frequency (TF) of each token for a specific document chunk.
+
+        Args:
+            tokens_freq (dict[str, int]): A dictionary of token frequencies in the current document.
+            chunk_id (str): The unique identifier (index) of the current chunk.
+            bm25s (BM25s): The BM25 statistics object.
+        """
         for word, freq in tokens_freq.items():
             bm25s.tf[word][chunk_id] = freq
 
     @staticmethod
     def _update_dl(word_quan: int, chunk_id: str, bm25s: BM25s) -> None:
+        """
+        Records the length of a specific document chunk.
+
+        Args:
+            word_quan (int): The number of tokens in the current document.
+            chunk_id (str): The unique identifier (index) of the current chunk.
+            bm25s (BM25s): The BM25 statistics object.
+        """
         bm25s.dl[chunk_id] = bm25s.dl.get(chunk_id, 0) + word_quan
 
     @staticmethod
     def calculate_avgdl(bm25s: BM25s) -> None:
         """
         Calculates the Average Document Length (avgdl) for the entire corpus.
-
         Must be called after all documents have been processed.
+
+        Args:
+            bm25s (BM25s): The BM25 statistics object containing N_total and total_dl.
+
+        Raises:
+            SystemExit: If N_total is 0 (i.e., no documents were indexed).
         """
         if bm25s.N_total == 0:
             error_exit(f"{log_location()}\n"
@@ -92,9 +149,14 @@ class BM25Methods:
     def calculate_idf(bm25s: BM25s) -> None:
         """
         Calculates the Inverse Document Frequency (IDF) for all unique tokens.
+        Applies smoothing to prevent division by zero and negative IDF scores.
+        Must be called after all documents have been processed.
 
-        Applies smoothing to prevent negative IDF scores. Must be called after
-        all documents have been processed.
+        Args:
+            bm25s (BM25s): The BM25 statistics object to update with calculated IDF values.
+
+        Raises:
+            SystemExit: If the document frequency (df) dictionary is empty.
         """
         if not bm25s.df:
             error_exit(f"{log_location()}\n"
@@ -111,10 +173,10 @@ class BM25Methods:
     @staticmethod
     def get_top_k(query: str, bm25s: BM25s, k: int) -> list[tuple[str, float]]:
         """
-        Scores and retrieves the top-k document chunks for a given query.
+        Scores and retrieves the top-k document chunks for a given query based on BM25.
 
         Args:
-            query (str): The raw search query.
+            query (str): The raw search query entered by the user.
             bm25s (BM25s): The populated BM25 statistics object.
             k (int): The number of top-scoring chunks to return.
 

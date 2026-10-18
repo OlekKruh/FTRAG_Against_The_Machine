@@ -19,24 +19,24 @@ class Chunker:
 
         Args:
             max_size (int): The maximum allowed character length for a single chunk.
+                            Clamped between 600 and 2000 to ensure reasonable chunk sizes.
         """
+        py_size = max(600, min(max_size, 2000))
+        md_size = max(600, min(max_size, 2000))
 
-        py_size = max(600, min(max_size, 1500))
-        md_size = max(600, min(max_size, 1500))
-
-        print(f"-> [DEBUG] Input: {max_size} | py_size: {py_size} | md_size: {md_size}")
+        # print(f"-> [DEBUG] Input: {max_size} | py_size: {py_size} | md_size: {md_size}")
 
         self.splitters = {
             ".py": RecursiveCharacterTextSplitter.from_language(
                 language=Language.PYTHON,
                 chunk_size=py_size,
-                chunk_overlap=0,
+                chunk_overlap=300,
                 add_start_index=True,
             ),
             ".md": RecursiveCharacterTextSplitter.from_language(
                 language=Language.MARKDOWN,
                 chunk_size=md_size,
-                chunk_overlap=250,
+                chunk_overlap=300,
                 add_start_index=True,
             )
         }
